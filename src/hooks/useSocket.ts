@@ -46,6 +46,14 @@ export function useSocket(options: UseSocketOptions = {}) {
   const [socketInstance, setSocketInstance] = useState<Socket | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const eventListenersRef = useRef<{ cleanup: () => void } | null>(null);
+  
+  // Store callbacks in refs to avoid dependency issues
+  const callbacksRef = useRef({ onConnect, onDisconnect, onError, onConnectionSuccess });
+  
+  // Update callbacks ref when they change
+  useEffect(() => {
+    callbacksRef.current = { onConnect, onDisconnect, onError, onConnectionSuccess };
+  }, [onConnect, onDisconnect, onError, onConnectionSuccess]);
 
   // Helper function to setup event listeners
   const setupEventListeners = (socket: Socket) => {
@@ -56,12 +64,12 @@ export function useSocket(options: UseSocketOptions = {}) {
 
     const handleConnect = () => {
       setIsConnected(true);
-      onConnect?.();
+      callbacksRef.current.onConnect?.();
     };
 
     const handleDisconnect = () => {
       setIsConnected(false);
-      onDisconnect?.();
+      callbacksRef.current.onDisconnect?.();
     };
 
     const handleConnectError = async (error: any) => {
@@ -87,6 +95,7 @@ export function useSocket(options: UseSocketOptions = {}) {
             // Create new socket with new token
             const newSocket = getSocket(serverUrl, newToken);
             socketRef.current = newSocket;
+            setSocketInstance(newSocket);
             
             // Setup event listeners for new socket
             setupEventListeners(newSocket);
@@ -100,28 +109,28 @@ export function useSocket(options: UseSocketOptions = {}) {
             setAccessToken(newToken);
           } else {
             // No token available, user needs to login again
-            onError?.(new Error("Authentication failed. Please login again."));
+            callbacksRef.current.onError?.(new Error("Authentication failed. Please login again."));
           }
         } catch (refreshError) {
           console.error("Failed to refresh token:", refreshError);
-          onError?.(refreshError instanceof Error ? refreshError : new Error("Failed to refresh token"));
+          callbacksRef.current.onError?.(refreshError instanceof Error ? refreshError : new Error("Failed to refresh token"));
         }
       } else {
         // Not an auth error, just pass it through
-        onError?.(error);
+        callbacksRef.current.onError?.(error);
       }
     };
 
     const handleConnectionSuccess = (data: any) => {
       console.log("✅ Connection success:", data);
-      onConnectionSuccess?.(data);
+      callbacksRef.current.onConnectionSuccess?.(data);
     };
 
     const handleError = (error: any) => {
       console.error("Socket error event:", error);
       // error format: { success: false, error: { code, type, message, timestamp } }
       const errorMessage = error?.error?.message || error?.message || "Unknown socket error";
-      onError?.(new Error(errorMessage));
+      callbacksRef.current.onError?.(new Error(errorMessage));
     };
 
       socket.on("connect", handleConnect);
@@ -171,8 +180,19 @@ export function useSocket(options: UseSocketOptions = {}) {
       return;
     }
 
+    // Don't recreate socket if it already exists and is valid
+    const currentToken = (socketRef.current?.auth as any)?.token;
+    const token = providedToken || accessToken || undefined;
+    
+    if (socketRef.current && socketRef.current.connected && currentToken === token) {
+      // Socket already exists and is connected with same token, just update state
+      if (socketInstance !== socketRef.current) {
+        setSocketInstance(socketRef.current);
+      }
+      return;
+    }
+
     try {
-      const token = providedToken || accessToken || undefined;
       console.log("🔌 [useSocket] Creating socket instance...", {
         hasToken: !!token,
         serverUrl,
@@ -181,7 +201,7 @@ export function useSocket(options: UseSocketOptions = {}) {
       
       const socket = getSocket(serverUrl, token);
       socketRef.current = socket;
-      setSocketInstance(socket); // Update state to trigger re-render
+      setSocketInstance(socket);
 
       console.log("✅ [useSocket] Socket instance created:", {
         socketId: socket.id,
@@ -207,9 +227,10 @@ export function useSocket(options: UseSocketOptions = {}) {
       };
     } catch (error) {
       console.error("❌ [useSocket] Failed to initialize socket:", error);
-      onError?.(error instanceof Error ? error : new Error("Failed to initialize socket"));
+      callbacksRef.current.onError?.(error instanceof Error ? error : new Error("Failed to initialize socket"));
     }
-  }, [autoConnect, onConnect, onDisconnect, onError, onConnectionSuccess, serverUrl, providedToken, accessToken]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoConnect, serverUrl, providedToken, accessToken]);
 
   // Cleanup on unmount
   useEffect(() => {
