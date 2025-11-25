@@ -35,7 +35,16 @@ export function ChatHeader({ user, socket: providedSocket, isSocketConnected: pr
   const isSelectedUserOnline = user ? isUserOnline(user.id) : false;
 
   // Debug: log when component renders
-  console.log("🟢 [ChatHeader] Rendered with user:", user?.name || "undefined", "Socket exists:", !!socket, "Is Connected:", isConnected);
+  useEffect(() => {
+    console.log("🟢 [ChatHeader] Rendered with user:", user?.name || "undefined", {
+      socketExists: !!socket,
+      socketId: socket?.id,
+      socketConnected: socket?.connected,
+      isConnected,
+      providedSocket: !!providedSocket,
+      fallbackSocket: !!fallbackSocket,
+    });
+  }, [user?.name, socket, isConnected, providedSocket, fallbackSocket]);
 
   useEffect(() => {
     if (!socket || !user) {

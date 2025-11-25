@@ -43,6 +43,7 @@ export function useSocket(options: UseSocketOptions = {}) {
   const { autoConnect = false, onConnect, onDisconnect, onError, onConnectionSuccess, serverUrl, accessToken: providedToken } = options;
   const [isConnected, setIsConnected] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(providedToken || null);
+  const [socketInstance, setSocketInstance] = useState<Socket | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const eventListenersRef = useRef<{ cleanup: () => void } | null>(null);
 
@@ -166,19 +167,33 @@ export function useSocket(options: UseSocketOptions = {}) {
   useEffect(() => {
     // Wait for access token if autoConnect is enabled
     if (autoConnect && !providedToken && accessToken === null) {
+      console.log("⏳ [useSocket] Waiting for access token...");
       return;
     }
 
     try {
       const token = providedToken || accessToken || undefined;
+      console.log("🔌 [useSocket] Creating socket instance...", {
+        hasToken: !!token,
+        serverUrl,
+        autoConnect,
+      });
+      
       const socket = getSocket(serverUrl, token);
       socketRef.current = socket;
+      setSocketInstance(socket); // Update state to trigger re-render
+
+      console.log("✅ [useSocket] Socket instance created:", {
+        socketId: socket.id,
+        connected: socket.connected,
+      });
 
       // Setup event listeners
       setupEventListeners(socket);
 
       // Auto connect if enabled
       if (autoConnect && !socket.connected) {
+        console.log("🔗 [useSocket] Attempting to connect...");
         socket.connect();
       }
 
@@ -191,10 +206,10 @@ export function useSocket(options: UseSocketOptions = {}) {
         }
       };
     } catch (error) {
-      console.error("Failed to initialize socket:", error);
+      console.error("❌ [useSocket] Failed to initialize socket:", error);
       onError?.(error instanceof Error ? error : new Error("Failed to initialize socket"));
     }
-  }, [autoConnect, onConnect, onDisconnect, onError, serverUrl, providedToken, accessToken]);
+  }, [autoConnect, onConnect, onDisconnect, onError, onConnectionSuccess, serverUrl, providedToken, accessToken]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -219,7 +234,7 @@ export function useSocket(options: UseSocketOptions = {}) {
   };
 
   return {
-    socket: socketRef.current,
+    socket: socketInstance,
     isConnected,
     connect,
     disconnect,

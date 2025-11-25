@@ -59,7 +59,17 @@ export function getSocket(serverUrl?: string, accessToken?: string): Socket {
     };
   }
 
+  console.log("🔌 [getSocket] Creating socket connection to:", url);
   socket = io(url, socketOptions);
+
+  // Add connection logging
+  socket.on("connect", () => {
+    console.log("✅ [getSocket] Socket connected, ID:", socket?.id);
+  });
+
+  socket.on("connect_error", (error) => {
+    console.error("❌ [getSocket] Connection error:", error.message);
+  });
 
   return socket;
 }
