@@ -7,13 +7,14 @@ import { UserInfo } from "./UserInfo";
 interface HeaderPanelProps {
   user: User | null;
   isLoading: boolean;
+  onLoginSuccess?: () => void;
 }
 
-export function HeaderPanel({ user, isLoading }: HeaderPanelProps) {
+export function HeaderPanel({ user, isLoading, onLoginSuccess }: HeaderPanelProps) {
   return (
     <div className="flex h-full items-center border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-3 gap-6">
       {/* Left Half: Input Fields + Login Button */}
-      {!user && <LoginForm />}
+      {!user && <LoginForm onLoginSuccess={onLoginSuccess} />}
 
       {/* Divider */}
       {user && <div className="h-12 w-px bg-border/60" />}

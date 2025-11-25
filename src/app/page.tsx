@@ -2,7 +2,7 @@
 
 import { ChatPanel } from "@/components/Chat/ChatPanel";
 import { ContentPanel } from "@/components/Chat/ContentPanel";
-import { HeaderPanel } from "@/components/Header/HeaderPanel";
+import { HeaderPanel } from "@/components/shared/Header/HeaderPanel";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -15,7 +15,7 @@ import { Conversation, Friend, UserListItem } from "@/types/user";
 import { useMemo, useState } from "react";
 
 export default function Home() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, refresh: refreshAuth } = useAuth();
   const {
     conversations,
     isLoading: isLoadingConversations,
@@ -114,7 +114,7 @@ export default function Home() {
       >
         {/* Header Panel */}
         <ResizablePanel defaultSize={20} minSize={15}>
-          <HeaderPanel user={user} isLoading={isLoading} />
+          <HeaderPanel user={user} isLoading={isLoading} onLoginSuccess={refreshAuth} />
         </ResizablePanel>
 
         <ResizableHandle withHandle />

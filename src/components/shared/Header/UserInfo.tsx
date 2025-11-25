@@ -1,6 +1,6 @@
 "use client";
 
-import { logout } from "@/app/actions";
+import { logout } from "@/actions/actions";
 import { Button } from "@/components/ui/button";
 import { User } from "@/types/user";
 
@@ -51,4 +51,3 @@ export function UserInfo({ user }: UserInfoProps) {
     </>
   );
 }
-

@@ -1,18 +1,18 @@
 "use client";
 
-import { getFriends } from "@/app/actions";
-import { Friend, FriendsResponse, PaginationMeta } from "@/types/user";
+import { getConversations } from "@/actions/actions";
+import { Conversation, ConversationsResponse, PaginationMeta } from "@/types/user";
 import { useEffect, useState, useCallback } from "react";
 
-export function useFriends(limit = 20) {
-  const [friends, setFriends] = useState<Friend[]>([]);
+export function useConversations(limit = 20) {
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  const fetchFriends = useCallback(async (pageNum: number, append = false) => {
+  const fetchConversations = useCallback(async (pageNum: number, append = false) => {
     try {
       if (append) {
         setIsLoadingMore(true);
@@ -21,18 +21,18 @@ export function useFriends(limit = 20) {
       }
       setError(null);
 
-      const response = (await getFriends(pageNum, limit)) as FriendsResponse | null;
+      const response = (await getConversations(pageNum, limit)) as ConversationsResponse | null;
 
       if (!response || response.status !== "success") {
-        throw new Error(response?.message || "Failed to fetch friends");
+        throw new Error(response?.message || "Failed to fetch conversations");
       }
 
-      const { data: friendsData, meta: paginationMeta } = response.data;
+      const { data: conversationsData, meta: paginationMeta } = response.data;
 
       if (append) {
-        setFriends((prev) => [...prev, ...friendsData]);
+        setConversations((prev) => [...prev, ...conversationsData]);
       } else {
-        setFriends(friendsData);
+        setConversations(conversationsData);
       }
 
       setMeta(paginationMeta);
@@ -40,7 +40,7 @@ export function useFriends(limit = 20) {
     } catch (err) {
       setError(err instanceof Error ? err : new Error("Unknown error"));
       if (!append) {
-        setFriends([]);
+        setConversations([]);
       }
     } finally {
       setIsLoading(false);
@@ -50,20 +50,20 @@ export function useFriends(limit = 20) {
 
   const loadMore = useCallback(() => {
     if (meta?.hasNextPage && !isLoadingMore && !isLoading) {
-      fetchFriends(page + 1, true);
+      fetchConversations(page + 1, true);
     }
-  }, [meta, page, isLoadingMore, isLoading, fetchFriends]);
+  }, [meta, page, isLoadingMore, isLoading, fetchConversations]);
 
   const refresh = useCallback(() => {
-    fetchFriends(1, false);
-  }, [fetchFriends]);
+    fetchConversations(1, false);
+  }, [fetchConversations]);
 
   useEffect(() => {
-    fetchFriends(1, false);
-  }, [fetchFriends]);
+    fetchConversations(1, false);
+  }, [fetchConversations]);
 
   return {
-    friends,
+    conversations,
     isLoading,
     isLoadingMore,
     error,

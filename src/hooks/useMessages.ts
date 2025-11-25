@@ -1,8 +1,8 @@
 "use client";
 
-import { getMessages } from "@/app/actions";
+import { getMessages } from "@/actions/actions";
 import { Message, MessagesResponse } from "@/types/user";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useMessages(conversationId: number | null, currentUserId?: number, limit = 20) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -29,7 +29,7 @@ export function useMessages(conversationId: number | null, currentUserId?: numbe
         }
         setError(null);
 
-        const response = (await getMessages(convId, limit, cursor)) as MessagesResponse | null;
+        const response = (await (getMessages as (convId: number, limit: number, cursor?: number | null) => Promise<MessagesResponse | null>)(convId, limit, cursor)) as MessagesResponse | null;
 
         if (!response || response.status !== "success") {
           throw new Error(response?.message || "Failed to fetch messages");

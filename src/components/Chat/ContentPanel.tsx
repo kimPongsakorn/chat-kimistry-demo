@@ -1,6 +1,6 @@
 "use client";
 
-import { sendMessage } from "@/app/actions";
+import { sendMessage } from "@/actions/actions";
 import { useMessages } from "@/hooks/useMessages";
 import { UserListItem } from "@/types/user";
 import { useEffect, useRef, useState } from "react";

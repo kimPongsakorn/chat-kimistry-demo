@@ -1,18 +1,18 @@
 "use client";
 
-import { login } from "@/app/actions";
+import { login } from "@/actions/actions";
 import { Button } from "@/components/ui/button";
 import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormMessage,
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import * as z from "zod";
 
 const formSchema = z.object({
@@ -23,8 +23,11 @@ const formSchema = z.object({
     .min(6, "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร"),
 });
 
-export function LoginForm() {
-  const router = useRouter();
+interface LoginFormProps {
+  onLoginSuccess?: () => void;
+}
+
+export function LoginForm({ onLoginSuccess }: LoginFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -40,9 +43,12 @@ export function LoginForm() {
       formData.append("password", data.password);
       const result = await login(formData);
       
-      // หลังจาก login สำเร็จ ให้ refresh หน้าเพื่อดึงข้อมูล user ใหม่
+      // หลังจาก login สำเร็จ ให้ refresh user data
       if (result?.success) {
-        router.refresh();
+        toast.success("Login successful");
+        onLoginSuccess?.();
+        // Reset form
+        form.reset();
       }
     } catch (error) {
       // แสดง error message เมื่อ login ล้มเหลว
