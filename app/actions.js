@@ -1,5 +1,6 @@
 'use server'
 
+import { getBaseApiUrl } from '@/lib/api'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
@@ -8,8 +9,8 @@ export async function login(formData) {
   const password = formData.get('password')
 
   // 1. ยิง API
-  const BASE_API = process.env.BASE_API || process.env.NEXT_PUBLIC_BASE_API || 'https://mobile-api-production-40c5.up.railway.app'
-  const apiUrl = `${BASE_API.replace(/\/$/, '')}/api/v1/auth/login`
+  const BASE_API = getBaseApiUrl()
+  const apiUrl = `${BASE_API}/api/v1/auth/login`
   
   const res = await fetch(apiUrl, {
     method: 'POST',
@@ -84,8 +85,8 @@ export async function getUser() {
   
   try {
     // ยิง API เพื่อดึงข้อมูล user ล่าสุดจาก server
-    const BASE_API = process.env.BASE_API || process.env.NEXT_PUBLIC_BASE_API || 'https://mobile-api-production-40c5.up.railway.app'
-    const apiUrl = `${BASE_API.replace(/\/$/, '')}/api/v1/auth/me`
+    const BASE_API = getBaseApiUrl()
+    const apiUrl = `${BASE_API}/api/v1/auth/me`
     
     const res = await fetch(apiUrl, {
       method: 'GET',
@@ -153,8 +154,8 @@ export async function logout() {
   // 1. ยิง API logout ถ้ามี accessToken
   if (accessToken) {
     try {
-      const BASE_API = process.env.BASE_API || process.env.NEXT_PUBLIC_BASE_API || 'https://mobile-api-production-40c5.up.railway.app'
-      const apiUrl = `${BASE_API.replace(/\/$/, '')}/api/v1/auth/logout`
+      const BASE_API = getBaseApiUrl()
+      const apiUrl = `${BASE_API}/api/v1/auth/logout`
       
       await fetch(apiUrl, {
         method: 'POST',
