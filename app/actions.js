@@ -1,6 +1,7 @@
 'use server'
 
 import { getBaseApiUrl } from '@/lib/api'
+import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
@@ -71,8 +72,11 @@ export async function login(formData) {
     maxAge: 60 * 60 * 24 * 7, // 7 วัน
   })
 
-  // 8. จบงาน -> กลับไปหน้าแรก (จะแสดงข้อมูล user ที่ login แล้ว)
-  redirect('/')
+  // 8. Revalidate path เพื่อให้ Next.js refresh ข้อมูล
+  revalidatePath('/')
+
+  // 9. Return success (ไม่ใช้ redirect เพราะจะ throw error ใน client component)
+  return { success: true, user }
 }
 
 export async function getUser() {
@@ -135,7 +139,7 @@ export async function getUser() {
   }
 }
 
-export async function getFriends() {
+export async function getFriends(page = 1, limit = 20) {
   const cookieStore = await cookies()
   const accessToken = cookieStore.get('accessToken')?.value
   
@@ -143,8 +147,324 @@ export async function getFriends() {
     return null
   }
   
-  // TODO: Implement getFriends API call
-  return null
+  try {
+    const BASE_API = getBaseApiUrl()
+    const apiUrl = `${BASE_API}/api/v1/users/friends?page=${page}&limit=${limit}`
+    
+    const res = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'accept': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    })
+    
+    // ถ้า access token หมดอายุ ลอง refresh token
+    if (res.status === 401) {
+      try {
+        await refreshToken()
+        // Retry request with new token
+        const newAccessToken = (await cookies()).get('accessToken')?.value
+        if (newAccessToken) {
+          const retryRes = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+              'accept': 'application/json',
+              'Authorization': `Bearer ${newAccessToken}`,
+            },
+          })
+          
+          if (!retryRes.ok) {
+            const errorData = await retryRes.json().catch(() => ({}))
+            throw new Error(errorData.message || `Failed to get friends: ${retryRes.status}`)
+          }
+          
+          const responseJson = await retryRes.json()
+          return responseJson
+        }
+      } catch (refreshError) {
+        throw new Error('Session expired. Please login again.')
+      }
+    }
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}))
+      throw new Error(errorData.message || `Failed to get friends: ${res.status}`)
+    }
+    
+    const responseJson = await res.json()
+    return responseJson
+  } catch (error) {
+    console.error('Get friends error:', error)
+    throw error
+  }
+}
+
+export async function refreshToken() {
+  const cookieStore = await cookies()
+  const refreshTokenValue = cookieStore.get('refreshToken')?.value
+  
+  if (!refreshTokenValue) {
+    throw new Error('No refresh token available')
+  }
+  
+  try {
+    const BASE_API = getBaseApiUrl()
+    const apiUrl = `${BASE_API}/api/v1/auth/refresh`
+    
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken: refreshTokenValue }),
+    })
+    
+    if (!res.ok) {
+      // ถ้า refresh token หมดอายุ ให้ลบ cookies ทั้งหมด
+      if (res.status === 401) {
+        cookieStore.delete('accessToken')
+        cookieStore.delete('refreshToken')
+        cookieStore.delete('user')
+      }
+      const errorData = await res.json().catch(() => ({}))
+      throw new Error(errorData.message || `Failed to refresh token: ${res.status}`)
+    }
+    
+    const responseJson = await res.json()
+    
+    if (responseJson.status === 'success' && responseJson.data) {
+      const { accessToken, refreshToken: newRefreshToken } = responseJson.data
+      
+      // อัพเดท Access Token
+      cookieStore.set({
+        name: 'accessToken',
+        value: accessToken,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        maxAge: 60 * 15, // 15 นาที
+      })
+      
+      // อัพเดท Refresh Token (ถ้ามี)
+      if (newRefreshToken) {
+        cookieStore.set({
+          name: 'refreshToken',
+          value: newRefreshToken,
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          path: '/',
+          maxAge: 60 * 60 * 24 * 7, // 7 วัน
+        })
+      }
+      
+      return { accessToken, refreshToken: newRefreshToken }
+    }
+    
+    throw new Error('Invalid response from refresh token API')
+  } catch (error) {
+    console.error('Refresh token error:', error)
+    throw error
+  }
+}
+
+export async function sendMessage(conversationId, content) {
+  const cookieStore = await cookies()
+  const accessToken = cookieStore.get('accessToken')?.value
+  
+  if (!accessToken) {
+    throw new Error('Not authenticated')
+  }
+  
+  if (!conversationId) {
+    throw new Error('Conversation ID is required')
+  }
+  
+  try {
+    const BASE_API = getBaseApiUrl()
+    const apiUrl = `${BASE_API}/api/v1/chat/messages`
+    
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ conversationId, content }),
+    })
+    
+    // ถ้า access token หมดอายุ ลอง refresh token
+    if (res.status === 401) {
+      try {
+        await refreshToken()
+        // Retry request with new token
+        const newAccessToken = (await cookies()).get('accessToken')?.value
+        if (newAccessToken) {
+          const retryRes = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${newAccessToken}`,
+            },
+            body: JSON.stringify({ conversationId, content }),
+          })
+          
+          if (!retryRes.ok) {
+            const errorData = await retryRes.json().catch(() => ({}))
+            throw new Error(errorData.message || `Failed to send message: ${retryRes.status}`)
+          }
+          
+          const responseJson = await retryRes.json()
+          return responseJson
+        }
+      } catch (refreshError) {
+        throw new Error('Session expired. Please login again.')
+      }
+    }
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}))
+      throw new Error(errorData.message || `Failed to send message: ${res.status}`)
+    }
+    
+    const responseJson = await res.json()
+    return responseJson
+  } catch (error) {
+    console.error('Send message error:', error)
+    throw error
+  }
+}
+
+export async function getMessages(conversationId, limit = 20, cursor = null) {
+  const cookieStore = await cookies()
+  const accessToken = cookieStore.get('accessToken')?.value
+  
+  if (!accessToken) {
+    return null
+  }
+  
+  if (!conversationId) {
+    return null
+  }
+  
+  try {
+    const BASE_API = getBaseApiUrl()
+    let apiUrl = `${BASE_API}/api/v1/chat/messages/${conversationId}?limit=${limit}`
+    if (cursor) {
+      apiUrl += `&cursor=${cursor}`
+    }
+    
+    const res = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'accept': '*/*',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    })
+    
+    // ถ้า access token หมดอายุ ลอง refresh token
+    if (res.status === 401) {
+      try {
+        await refreshToken()
+        // Retry request with new token
+        const newAccessToken = (await cookies()).get('accessToken')?.value
+        if (newAccessToken) {
+          const retryRes = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+              'accept': '*/*',
+              'Authorization': `Bearer ${newAccessToken}`,
+            },
+          })
+          
+          if (!retryRes.ok) {
+            const errorData = await retryRes.json().catch(() => ({}))
+            throw new Error(errorData.message || `Failed to get messages: ${retryRes.status}`)
+          }
+          
+          const responseJson = await retryRes.json()
+          return responseJson
+        }
+      } catch (refreshError) {
+        throw new Error('Session expired. Please login again.')
+      }
+    }
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}))
+      throw new Error(errorData.message || `Failed to get messages: ${res.status}`)
+    }
+    
+    const responseJson = await res.json()
+    return responseJson
+  } catch (error) {
+    console.error('Get messages error:', error)
+    throw error
+  }
+}
+
+export async function getConversations(page = 1, limit = 20) {
+  const cookieStore = await cookies()
+  const accessToken = cookieStore.get('accessToken')?.value
+  
+  if (!accessToken) {
+    return null
+  }
+  
+  try {
+    const BASE_API = getBaseApiUrl()
+    const apiUrl = `${BASE_API}/api/v1/chat/conversations?page=${page}&limit=${limit}`
+    
+    const res = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'accept': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    })
+    
+    // ถ้า access token หมดอายุ ลอง refresh token
+    if (res.status === 401) {
+      try {
+        await refreshToken()
+        // Retry request with new token
+        const newAccessToken = (await cookies()).get('accessToken')?.value
+        if (newAccessToken) {
+          const retryRes = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+              'accept': 'application/json',
+              'Authorization': `Bearer ${newAccessToken}`,
+            },
+          })
+          
+          if (!retryRes.ok) {
+            const errorData = await retryRes.json().catch(() => ({}))
+            throw new Error(errorData.message || `Failed to get conversations: ${retryRes.status}`)
+          }
+          
+          const responseJson = await retryRes.json()
+          return responseJson
+        }
+      } catch (refreshError) {
+        throw new Error('Session expired. Please login again.')
+      }
+    }
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}))
+      throw new Error(errorData.message || `Failed to get conversations: ${res.status}`)
+    }
+    
+    const responseJson = await res.json()
+    return responseJson
+  } catch (error) {
+    console.error('Get conversations error:', error)
+    throw error
+  }
 }
 
 export async function logout() {

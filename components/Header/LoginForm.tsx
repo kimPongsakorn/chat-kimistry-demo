@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 
@@ -23,6 +24,7 @@ const formSchema = z.object({
 });
 
 export function LoginForm() {
+  const router = useRouter();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -36,9 +38,12 @@ export function LoginForm() {
       const formData = new FormData();
       formData.append("email", data.email);
       formData.append("password", data.password);
-      await login(formData);
+      const result = await login(formData);
+      
       // หลังจาก login สำเร็จ ให้ refresh หน้าเพื่อดึงข้อมูล user ใหม่
-      window.location.reload();
+      if (result?.success) {
+        router.refresh();
+      }
     } catch (error) {
       // แสดง error message เมื่อ login ล้มเหลว
       form.setError("root", {
