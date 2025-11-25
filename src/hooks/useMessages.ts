@@ -10,7 +10,7 @@ export function useMessages(conversationId: number | null, currentUserId?: numbe
   const [error, setError] = useState<Error | null>(null);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const hasLoadedRef = useRef(false);
+  const previousConversationIdRef = useRef<number | null>(null);
 
   const fetchMessages = useCallback(
     async (convId: number | null, cursor: number | null = null, append = false) => {
@@ -74,20 +74,25 @@ export function useMessages(conversationId: number | null, currentUserId?: numbe
 
   const refresh = useCallback(() => {
     if (conversationId) {
-      hasLoadedRef.current = false;
       fetchMessages(conversationId, null, false);
     }
   }, [conversationId, fetchMessages]);
 
   // Auto-load messages when conversationId changes
   useEffect(() => {
-    if (conversationId && !hasLoadedRef.current) {
-      hasLoadedRef.current = true;
-      fetchMessages(conversationId, null, false);
-    } else if (!conversationId) {
-      hasLoadedRef.current = false;
-      setMessages([]);
-      setNextCursor(null);
+    // If conversationId changed, clear messages and fetch new ones
+    if (conversationId !== previousConversationIdRef.current) {
+      if (conversationId) {
+        // Clear messages immediately when switching conversations
+        setMessages([]);
+        setNextCursor(null);
+        fetchMessages(conversationId, null, false);
+      } else {
+        // Clear messages when conversationId is null
+        setMessages([]);
+        setNextCursor(null);
+      }
+      previousConversationIdRef.current = conversationId;
     }
   }, [conversationId, fetchMessages]);
 
