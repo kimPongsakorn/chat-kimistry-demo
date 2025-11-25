@@ -3,7 +3,6 @@
 import { getBaseApiUrl } from '@/lib/api'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
 
 export async function login(formData) {
   const email = formData.get('email')
@@ -495,6 +494,6 @@ export async function logout() {
   cookieStore.delete('refreshToken')
   cookieStore.delete('user')
   
-  // 3. Redirect กลับหน้าแรก
-  redirect('/')
+  // 3. Return success (ไม่ redirect เพราะเรียกจาก client component)
+  return { success: true }
 }

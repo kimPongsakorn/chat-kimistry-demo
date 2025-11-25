@@ -102,7 +102,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                 <FormControl>
                   <Input
                     type="password"
-                    placeholder="Token"
+                    placeholder="password"
                     className={`rounded-full border-border/50 focus:border-primary transition-colors ${
                       form.formState.errors.password
                         ? "border-destructive focus:border-destructive"

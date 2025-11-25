@@ -8,9 +8,10 @@ interface HeaderPanelProps {
   user: User | null;
   isLoading: boolean;
   onLoginSuccess?: () => void;
+  onLogoutSuccess?: () => void;
 }
 
-export function HeaderPanel({ user, isLoading, onLoginSuccess }: HeaderPanelProps) {
+export function HeaderPanel({ user, isLoading, onLoginSuccess, onLogoutSuccess }: HeaderPanelProps) {
   return (
     <div className="flex h-full items-center border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-3 gap-6">
       {/* Left Half: Input Fields + Login Button */}
@@ -24,7 +25,7 @@ export function HeaderPanel({ user, isLoading, onLoginSuccess }: HeaderPanelProp
         {isLoading ? (
           <div className="text-sm text-muted-foreground">กำลังโหลด...</div>
         ) : user ? (
-          <UserInfo user={user} />
+          <UserInfo user={user} onLogoutSuccess={onLogoutSuccess} />
         ) : (
           <div className="text-sm text-muted-foreground">
             ยังไม่ได้เข้าสู่ระบบ

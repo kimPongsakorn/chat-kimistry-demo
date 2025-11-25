@@ -30,6 +30,7 @@ export default function Home() {
     isLoadingMore: isLoadingMoreFriends,
     hasNextPage: hasNextPageFriends,
     loadMore: loadMoreFriends,
+    refresh: refreshFriends,
   } = useFriends();
   const [selectedUser, setSelectedUser] = useState<UserListItem | null>(null);
   const [selectedConversation, setSelectedConversation] =
@@ -106,6 +107,16 @@ export default function Home() {
     refreshConversations();
   };
 
+  const handleLoginSuccess = () => {
+    // Refresh auth first, then refresh friends and conversations
+    refreshAuth();
+    // Wait a bit for cookies to be set, then refresh data
+    setTimeout(() => {
+      refreshFriends();
+      refreshConversations();
+    }, 100);
+  };
+
   return (
     <div className="flex h-screen w-full items-center justify-center p-8">
       <ResizablePanelGroup
@@ -114,7 +125,12 @@ export default function Home() {
       >
         {/* Header Panel */}
         <ResizablePanel defaultSize={20} minSize={15}>
-          <HeaderPanel user={user} isLoading={isLoading} onLoginSuccess={refreshAuth} />
+          <HeaderPanel 
+            user={user} 
+            isLoading={isLoading} 
+            onLoginSuccess={handleLoginSuccess}
+            onLogoutSuccess={refreshAuth}
+          />
         </ResizablePanel>
 
         <ResizableHandle withHandle />
