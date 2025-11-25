@@ -96,6 +96,44 @@ export function useMessages(conversationId: number | null, currentUserId?: numbe
     }
   }, [conversationId, fetchMessages]);
 
+  const addMessage = useCallback((newMessage: Message) => {
+    // Add isSent field based on sender.id === currentUserId
+    const messageWithIsSent = {
+      ...newMessage,
+      isSent: newMessage.sender.id === currentUserId,
+    };
+
+    setMessages((prev) => {
+      // Check if message already exists (avoid duplicates)
+      const exists = prev.some((msg) => msg.id === newMessage.id);
+      if (exists) {
+        return prev;
+      }
+      // Append new message at the end (newest messages are at the bottom)
+      return [...prev, messageWithIsSent];
+    });
+  }, [currentUserId]);
+
+  const updateReadStatus = useCallback((userId: number, lastReadMessageId: number, lastReadAt: string) => {
+    setMessages((prev) =>
+      prev.map((msg) => {
+        // If message is before or equal to lastReadMessageId, mark as read by this user
+        if (msg.id <= lastReadMessageId) {
+          const readBy = msg.readBy || [];
+          const alreadyRead = readBy.some((r) => r.userId === userId);
+          if (!alreadyRead) {
+            return {
+              ...msg,
+              readBy: [...readBy, { userId, readAt: lastReadAt }],
+              isReadByMe: userId === currentUserId ? true : msg.isReadByMe,
+            };
+          }
+        }
+        return msg;
+      })
+    );
+  }, [currentUserId]);
+
   return {
     messages,
     isLoading,
@@ -104,6 +142,8 @@ export function useMessages(conversationId: number | null, currentUserId?: numbe
     hasNextPage: nextCursor !== null,
     loadMore,
     refresh,
+    addMessage,
+    updateReadStatus,
   };
 }
 

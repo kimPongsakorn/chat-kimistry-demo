@@ -2,20 +2,48 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useTypingIndicator } from "@/hooks/useTypingIndicator";
 import { Send } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Socket } from "socket.io-client";
 
 interface MessageInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
+  socket?: Socket | null;
+  conversationId?: number | null;
+  currentUserId?: number;
 }
 
-export function MessageInput({ onSend, disabled = false }: MessageInputProps) {
+export function MessageInput({ 
+  onSend, 
+  disabled = false,
+  socket,
+  conversationId,
+  currentUserId,
+}: MessageInputProps) {
   const [message, setMessage] = useState("");
+
+  // Use typing indicator hook
+  const { setIsTyping } = useTypingIndicator({
+    socket: socket || null,
+    conversationId: conversationId || null,
+    currentUserId,
+  });
+
+  // Handle typing indicator
+  useEffect(() => {
+    if (message.trim().length > 0) {
+      setIsTyping(true);
+    } else {
+      setIsTyping(false);
+    }
+  }, [message, setIsTyping]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() && !disabled) {
+      setIsTyping(false); // Stop typing when sending
       onSend(message.trim());
       setMessage("");
     }

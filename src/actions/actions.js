@@ -538,6 +538,12 @@ export async function createConversation(participantIds) {
   }
 }
 
+export async function getAccessToken() {
+  const cookieStore = await cookies()
+  const accessToken = cookieStore.get('accessToken')?.value
+  return accessToken || null
+}
+
 export async function logout() {
   const cookieStore = await cookies()
   const accessToken = cookieStore.get('accessToken')?.value

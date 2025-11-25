@@ -12,12 +12,36 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useConversations } from "@/hooks/useConversations";
 import { useFriends } from "@/hooks/useFriends";
+import { useSocket } from "@/hooks/useSocket";
 import { Conversation, Friend, UserListItem } from "@/types/user";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 export default function Home() {
   const { user, isLoading, refresh: refreshAuth } = useAuth();
+  
+  // Connect socket when user is logged in (ไม่ต้องรอเลือก user)
+  const { socket: globalSocket, isConnected: isSocketConnected } = useSocket({
+    autoConnect: !!user, // เชื่อมต่อทันทีเมื่อ login แล้ว
+    onConnect: () => {
+      console.log("✅ Socket connected globally");
+    },
+    onDisconnect: () => {
+      console.log("❌ Socket disconnected");
+    },
+    onError: (error) => {
+      console.error("❌ Socket error:", error);
+    },
+    onConnectionSuccess: (data) => {
+      console.log("✅ Connection success event received:", data);
+      // data: { success: true, data: { socketId, userId, email, timestamp } }
+      if (data?.success) {
+        console.log("Socket ID:", data.data?.socketId);
+        console.log("User ID:", data.data?.userId);
+      }
+    },
+  });
+
   const {
     conversations,
     isLoading: isLoadingConversations,
@@ -218,6 +242,8 @@ export default function Home() {
                 selectedUser={selectedUser}
                 currentUserId={user?.id}
                 conversationId={conversationId}
+                socket={globalSocket}
+                isSocketConnected={isSocketConnected}
                 onMessageSent={handleMessageSent}
               />
             </ResizablePanel>

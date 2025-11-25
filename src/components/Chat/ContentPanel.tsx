@@ -1,8 +1,10 @@
 "use client";
 
 import { sendMessage } from "@/actions/actions";
+import { useConversationSocket } from "@/hooks/useConversationSocket";
 import { useMessages } from "@/hooks/useMessages";
-import { UserListItem } from "@/types/user";
+import { useReadStatus } from "@/hooks/useReadStatus";
+import { Message, UserListItem } from "@/types/user";
 import { useEffect, useRef, useState } from "react";
 import { ChatHeader } from "./ChatHeader";
 import { MessageBubble } from "./MessageBubble";
@@ -13,6 +15,8 @@ interface ContentPanelProps {
   selectedUser: UserListItem | null;
   currentUserId?: number;
   conversationId: number | null;
+  socket?: any; // Socket instance from parent
+  isSocketConnected?: boolean; // Socket connection status from parent
   onMessageSent?: () => void;
 }
 
@@ -21,6 +25,8 @@ export function ContentPanel({
   selectedUser,
   currentUserId,
   conversationId,
+  socket,
+  isSocketConnected,
   onMessageSent,
 }: ContentPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -37,7 +43,94 @@ export function ContentPanel({
     hasNextPage,
     loadMore,
     refresh,
+    addMessage,
+    updateReadStatus,
   } = useMessages(conversationId, currentUserId);
+
+  // Join/leave conversation room
+  useConversationSocket({
+    socket,
+    conversationId,
+    onJoinSuccess: (data) => {
+      console.log("✅ Joined conversation room:", data);
+    },
+    onLeaveSuccess: (data) => {
+      console.log("✅ Left conversation room:", data);
+    },
+    onError: (error) => {
+      console.error("❌ Conversation socket error:", error);
+    },
+  });
+
+  // Listen for new messages from socket
+  useEffect(() => {
+    if (!socket || !socket.connected || !conversationId) {
+      return;
+    }
+
+    const handleNewMessage = (data: {
+      conversationId: number;
+      message: {
+        id: number;
+        content: string;
+        senderId: number;
+        sender: {
+          id: number;
+          email: string;
+          name: string;
+        };
+        createdAt: string;
+      };
+    }) => {
+      // Only handle messages for the current conversation
+      if (data.conversationId !== conversationId) {
+        return;
+      }
+
+      console.log("📨 New message received:", data);
+
+      // Convert socket message format to Message format
+      const newMessage: Message = {
+        id: data.message.id,
+        content: data.message.content,
+        createdAt: data.message.createdAt,
+        sender: data.message.sender,
+        readBy: [],
+        isReadByMe: false,
+      };
+
+      // Add message to the list
+      addMessage(newMessage);
+    };
+
+    socket.on("message:new", handleNewMessage);
+
+    return () => {
+      socket.off("message:new", handleNewMessage);
+    };
+  }, [socket, conversationId, addMessage]);
+
+  // Handle read status
+  const { markAsRead } = useReadStatus({
+    socket,
+    conversationId,
+    currentUserId,
+    onReadUpdate: (data) => {
+      updateReadStatus(data.userId, data.lastReadMessageId, data.lastReadAt);
+    },
+  });
+
+  // Mark conversation as read when messages are loaded and user is viewing
+  useEffect(() => {
+    if (conversationId && messages.length > 0 && !isLoading) {
+      // Mark as read after a short delay to ensure user is viewing
+      const timeoutId = setTimeout(() => {
+        markAsRead();
+      }, 1000);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [conversationId, messages.length, isLoading, markAsRead]);
 
   // Auto-scroll to bottom when new messages arrive (but not when loading older messages)
   useEffect(() => {
@@ -105,7 +198,11 @@ export function ContentPanel({
       }`}
     >
       {/* Header */}
-      <ChatHeader user={selectedUser} />
+      <ChatHeader 
+        user={selectedUser} 
+        socket={socket}
+        isSocketConnected={isSocketConnected}
+      />
 
       {/* Messages Area */}
       <div
@@ -148,6 +245,9 @@ export function ContentPanel({
       <MessageInput
         onSend={handleSendMessage}
         disabled={!conversationId || isBlurred || isSending}
+        socket={socket}
+        conversationId={conversationId}
+        currentUserId={currentUserId}
       />
     </div>
   );
