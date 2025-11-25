@@ -282,12 +282,12 @@ export async function sendMessage(conversationId, content) {
   
   try {
     const BASE_API = getBaseApiUrl()
-    const apiUrl = `${BASE_API}/api/v1/chat/messages`
+    const apiUrl = `${BASE_API}/api/v1/chat/message`
     
     const res = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'accept': 'application/json',
+        'accept': '*/*',
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${accessToken}`,
       },
@@ -304,7 +304,7 @@ export async function sendMessage(conversationId, content) {
           const retryRes = await fetch(apiUrl, {
             method: 'POST',
             headers: {
-              'accept': 'application/json',
+              'accept': '*/*',
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${newAccessToken}`,
             },
@@ -462,6 +462,78 @@ export async function getConversations(page = 1, limit = 20) {
     return responseJson
   } catch (error) {
     console.error('Get conversations error:', error)
+    throw error
+  }
+}
+
+export async function createConversation(participantIds) {
+  const cookieStore = await cookies()
+  let accessToken = cookieStore.get('accessToken')?.value
+  
+  if (!accessToken) {
+    throw new Error('Not authenticated')
+  }
+  
+  if (!participantIds || !Array.isArray(participantIds) || participantIds.length === 0) {
+    throw new Error('Participant IDs are required')
+  }
+  
+  try {
+    const BASE_API = getBaseApiUrl()
+    const apiUrl = `${BASE_API}/api/v1/chat/conversation`
+    
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ participantIds }),
+    })
+    
+    // ถ้า access token หมดอายุ ลอง refresh token
+    if (res.status === 401) {
+      try {
+        await refreshToken()
+        accessToken = (await cookies()).get('accessToken')?.value
+        if (!accessToken) throw new Error("Failed to refresh token.")
+
+        const retryRes = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ participantIds }),
+        })
+        
+        if (!retryRes.ok) {
+          const errorData = await retryRes.json().catch(() => ({}))
+          throw new Error(errorData.message || `Failed to create conversation: ${retryRes.status}`)
+        }
+        
+        const responseJson = await retryRes.json()
+        return responseJson
+      } catch (refreshError) {
+        console.error('Refresh token failed:', refreshError)
+        cookieStore.delete('accessToken')
+        cookieStore.delete('refreshToken')
+        cookieStore.delete('user')
+        throw new Error('Session expired. Please login again.')
+      }
+    }
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}))
+      throw new Error(errorData.message || `Failed to create conversation: ${res.status}`)
+    }
+    
+    const responseJson = await res.json()
+    return responseJson
+  } catch (error) {
+    console.error('Create conversation error:', error)
     throw error
   }
 }

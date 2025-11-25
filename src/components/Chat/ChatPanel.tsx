@@ -16,6 +16,7 @@ interface ChatPanelProps {
   hasNextPage?: boolean;
   isLoadingMoreFriends?: boolean;
   hasNextPageFriends?: boolean;
+  isCreatingConversation?: boolean;
   onUserSelect?: (user: UserListItem) => void;
   onConversationSelect?: (conversation: Conversation) => void;
   onLoadMore?: () => void;
@@ -34,6 +35,7 @@ export function ChatPanel({
   hasNextPage = false,
   isLoadingMoreFriends = false,
   hasNextPageFriends = false,
+  isCreatingConversation = false,
   onUserSelect,
   onConversationSelect,
   onLoadMore,
@@ -49,13 +51,18 @@ export function ChatPanel({
       <div className="shrink-0 p-6 pb-4">
         <UserList
           users={users}
-          isBlurred={isBlurred}
+          isBlurred={isBlurred || isCreatingConversation}
           selectedUserId={selectedUserId}
           isLoadingMore={isLoadingMoreFriends}
           hasNextPage={hasNextPageFriends}
           onUserSelect={onUserSelect}
           onLoadMore={onLoadMoreFriends}
         />
+        {isCreatingConversation && (
+          <div className="mt-2 text-center">
+            <span className="text-xs text-muted-foreground">กำลังสร้างห้องแชท...</span>
+          </div>
+        )}
       </div>
 
       {/* Divider */}

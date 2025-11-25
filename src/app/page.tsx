@@ -1,5 +1,6 @@
 "use client";
 
+import { createConversation } from "@/actions/actions";
 import { ChatPanel } from "@/components/Chat/ChatPanel";
 import { ContentPanel } from "@/components/Chat/ContentPanel";
 import { HeaderPanel } from "@/components/shared/Header/HeaderPanel";
@@ -12,7 +13,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useConversations } from "@/hooks/useConversations";
 import { useFriends } from "@/hooks/useFriends";
 import { Conversation, Friend, UserListItem } from "@/types/user";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 export default function Home() {
   const { user, isLoading, refresh: refreshAuth } = useAuth();
@@ -35,6 +37,8 @@ export default function Home() {
   const [selectedUser, setSelectedUser] = useState<UserListItem | null>(null);
   const [selectedConversation, setSelectedConversation] =
     useState<Conversation | null>(null);
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [pendingConversationId, setPendingConversationId] = useState<number | null>(null);
 
   // Calculate conversationId from selected user or conversation
   const conversationId = useMemo(() => {
@@ -57,12 +61,14 @@ export default function Home() {
     }));
   }, [friends]);
 
-  const handleUserSelect = (userItem: UserListItem) => {
+  const handleUserSelect = async (userItem: UserListItem) => {
     setSelectedUser(userItem);
     setSelectedConversation(null); // Clear conversation selection when selecting user
 
-    // If the selected friend has a conversationId, find and select that conversation
+    // Find the friend
     const friend = friends.find((f) => f.id === userItem.id);
+    
+    // If the friend has a conversationId, find and select that conversation
     if (friend?.conversationId) {
       const conversation = conversations.find(
         (c) => c.id === friend.conversationId
@@ -70,8 +76,51 @@ export default function Home() {
       if (conversation) {
         setSelectedConversation(conversation);
       }
+    } else if (friend && user?.id) {
+      // If conversationId is null, create a new conversation
+      setIsCreatingConversation(true);
+      try {
+        const participantIds = [user.id, friend.id];
+        const result = await createConversation(participantIds);
+        
+        if (result?.status === 'success' && result?.data) {
+          const createdConversationId = result.data.id;
+          setPendingConversationId(createdConversationId);
+          
+          // Refresh friends and conversations to get updated data
+          await Promise.all([
+            refreshFriends(),
+            refreshConversations(),
+          ]);
+          
+          toast.success("สร้างห้องแชทสำเร็จ");
+        }
+      } catch (error) {
+        console.error("Failed to create conversation:", error);
+        toast.error(
+          error instanceof Error 
+            ? error.message 
+            : "เกิดข้อผิดพลาดในการสร้างห้องแชท"
+        );
+      } finally {
+        setIsCreatingConversation(false);
+      }
     }
   };
+
+  // Watch for the newly created conversation to appear in the list
+  useEffect(() => {
+    if (pendingConversationId) {
+      const newConversation = conversations.find(
+        (c) => c.id === pendingConversationId
+      );
+      
+      if (newConversation) {
+        setSelectedConversation(newConversation);
+        setPendingConversationId(null);
+      }
+    }
+  }, [conversations, pendingConversationId]);
 
   const handleConversationSelect = (conversation: Conversation) => {
     setSelectedConversation(conversation);
@@ -152,6 +201,7 @@ export default function Home() {
                 hasNextPage={hasNextPage}
                 isLoadingMoreFriends={isLoadingMoreFriends}
                 hasNextPageFriends={hasNextPageFriends}
+                isCreatingConversation={isCreatingConversation}
                 onUserSelect={handleUserSelect}
                 onConversationSelect={handleConversationSelect}
                 onLoadMore={loadMore}
